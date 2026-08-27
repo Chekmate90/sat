@@ -15,7 +15,7 @@ Open a terminal in the project directory and create a virtual environment:
 
 ```powershell
 py -m venv .venv
-.\.venv\Scripts\Activate.ps1
+.venv\Scripts\Activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
