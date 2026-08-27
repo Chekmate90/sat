@@ -1,8 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from engine import find_conjunctions
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
+
+app.mount(
+    "/static",
+    StaticFiles(directory="frontend"),
+    name="static"
+)
 
 latest_results = []
 objects_tracked = 0
