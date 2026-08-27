@@ -17,6 +17,9 @@ FINE_STEP_SECONDS = 10
 
 SCREENING_THRESHOLD = 150
 
+VISUALIZATION_LIMIT = 10
+ORBIT_DURATION_MINUTES = 90
+ORBIT_SAMPLE_MINUTES = 5
 
 def create_satellite(data):
     satellite = Satrec()
@@ -61,6 +64,37 @@ def get_position(satellite, time):
         return None
 
     return position
+
+def gen_orbit_paths(satellites, start_time):
+    orbit_paths = []
+    
+    for object_data, satellite in satellites[:VISUALIZATION_LIMIT]:
+        points = []
+        
+        for minute in range(0,ORBIT_DURATION_MINUTES+1,ORBIT_SAMPLE_MINUTES):
+            sample_time = start_time + timedelta(minutes=minute)
+            position = get_position(satellite, sample_time)
+
+            if position is None:
+                continue
+                
+            points.append({
+                "x": round(position[0], 2),
+                "y": round(position[1], 2),
+                "z": round(position[2], 2),
+                "time": sample_time.isoformat()
+            })
+            
+        if points:
+            orbit_paths.append({
+                "name": object_data["OBJECT_NAME"],
+                "norad_id": object_data["NORAD_CAT_ID"],
+                "points": points
+            })
+    
+    return orbit_paths
+
+
 
 
 def find_conjunctions():
@@ -208,9 +242,12 @@ def find_conjunctions():
 
     return {
         "objects_tracked": len(objects),
-        "conjunctions": conjunctions
+        "conjunctions": conjunctions,
+        "orbit_paths": gen_orbit_paths(
+            satellites,
+            now
+        )
     }
-
 
 
 

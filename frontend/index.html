@@ -8,6 +8,11 @@
     <title>Space Debris Tracking Dashboard</title>
 
     <link rel="stylesheet" href="/static/style.css" />
+
+    <script
+      src="https://cdn.plot.ly/plotly-3.6.0.min.js"
+      charset="utf-8"
+    ></script>
   </head>
 
   <body>
@@ -73,6 +78,20 @@
       <!-- ================= STATUS ================= -->
 
       <div class="status" id="status">Waiting for data...</div>
+
+      <!-- ======= ORBITS ====== -->
+
+      <div class="orbit-section">
+        <div class="orbit-header">
+          <h2>2D Orbit View</h2>
+
+          <p>Earth-centered X-Y projection of selected orbital objects</p>
+        </div>
+
+        <div id="orbit-chart">
+          <div class="empty">Run an analysis to load orbit paths.</div>
+        </div>
+      </div>
 
       <!-- ================= TABLE ================= -->
 

@@ -12,6 +12,7 @@ app.mount(
 )
 
 latest_results = []
+latest_orbit_paths = []
 objects_tracked = 0
 
 
@@ -43,6 +44,7 @@ def conjunctions():
 def refresh():
 
     global latest_results
+    global latest_orbit_paths
     global objects_tracked
 
     result = find_conjunctions()
@@ -56,6 +58,7 @@ def refresh():
 
     latest_results = result["conjunctions"]
     objects_tracked = result["objects_tracked"]
+    latest_orbit_paths = result["orbit_paths"]
 
     return {
         "message": "Conjunction analysis completed",
@@ -63,6 +66,12 @@ def refresh():
         "events_found": len(latest_results)
     }
 
+
+@app.get("/orbits")
+def orbits():
+    return {
+        "orbit_paths": latest_orbit_paths
+    }
 
 @app.get("/dashboard")
 def dashboard():
