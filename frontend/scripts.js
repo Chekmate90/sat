@@ -1,3 +1,9 @@
+let availableOrbitPaths = [];
+let currentSort = {
+  key: "time_until_seconds",
+  direction: "asc",
+};
+
 async function refreshAnalysis() {
   const status = document.getElementById("status");
 
@@ -58,8 +64,8 @@ async function loadOrbits() {
     }
 
     const result = await response.json();
-
-    renderOrbitChart(result.orbit_paths);
+    availableOrbitPaths = result.orbit_paths;
+    renderOrbitChart(availableOrbitPaths);
   } catch (error) {
     console.error("Failed to load orbit paths:", error);
 
@@ -198,7 +204,8 @@ async function loadConjunctions() {
     const result = await response.json();
 
     // Get the actual conjunction array
-    const data = result.conjunctions;
+    conjunctionData = result.conjunctions;
+    const data = getSortedConjunctions();
 
     // Update objects tracked
     document.getElementById("objects-count").textContent =
@@ -215,6 +222,37 @@ async function loadConjunctions() {
     document.getElementById("status").textContent =
       "Failed to load conjunction data.";
   }
+}
+
+/* ==================================================
+        ARRANGES CONJUCTIONS
+    ================================================== */
+
+function sortConjunctions(key) {
+  if (currentSort.key === key) {
+    currentSort.direction = currentSort.direction === "asc" ? "desc" : "asc";
+  } else {
+    currentSort.key = key;
+    currentSort.direction = "asc";
+  }
+
+  updateDashboard(getSortedConjunctions());
+}
+
+function getSortedConjunctions() {
+  const direction = currentSort.direction === "asc" ? 1 : -1;
+  const key = currentSort.key;
+
+  return [...conjunctionData].sort((a, b) => {
+    const valueA = a[key];
+    const valueB = b[key];
+
+    if (typeof valueA === "string") {
+      return valueA.localeCompare(valueB) * direction;
+    }
+
+    return (valueA - valueB) * direction;
+  });
 }
 
 /* ==================================================
@@ -300,6 +338,12 @@ function updateDashboard(data) {
 
     const riskClass = getRiskClass(event.risk);
 
+    row.classList.add("conjunction-row");
+
+    row.addEventListener("click", () => {
+      selectConjunction(event, row);
+    });
+
     row.innerHTML = `
                 <td>
                     ${event.id}
@@ -322,6 +366,30 @@ function updateDashboard(data) {
             `;
     table.appendChild(row);
   }
+}
+
+/* ==================================================
+        SELECTION OF ROWS
+    ================================================== */
+function selectConjunction(event, selectedRow) {
+  const selectedOrbits = availableOrbitPaths.filter((orbit) => {
+    const noradId = String(orbit.norad_id);
+
+    return (
+      noradId === String(event.norad_a) || noradId === String(event.norad_b)
+    );
+  });
+
+  document.querySelectorAll(".conjunction-row").forEach((row) => {
+    row.classList.remove("selected");
+  });
+
+  selectedRow.classList.add("selected");
+
+  renderOrbitChart(selectedOrbits);
+
+  document.getElementById("status").textContent =
+    `Showing ${event.object_a} and ${event.object_b} — closest distance: ${event.distance_km} km`;
 }
 
 /* ==================================================

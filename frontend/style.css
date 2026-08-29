@@ -221,6 +221,12 @@ th {
   background: #234a38;
   color: #b4f39d;
   font-size: 18px;
+  cursor: pointer;
+  user-select: none;
+}
+
+th:hover {
+  color: #71b6ff;
 }
 
 td {
@@ -266,6 +272,20 @@ tr:hover {
   text-align: center;
   padding: 30px;
   color: #555;
+}
+
+.conjunction-row {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.conjunction-row:hover {
+  background-color: rgba(113, 182, 255, 0.12);
+}
+
+.conjunction-row.selected {
+  background-color: rgba(113, 182, 255, 0.25);
+  outline: 1px solid #71b6ff;
 }
 
 /* ================= RESPONSIVE ================= */

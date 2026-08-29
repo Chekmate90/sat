@@ -17,7 +17,6 @@ FINE_STEP_SECONDS = 10
 
 SCREENING_THRESHOLD = 150
 
-VISUALIZATION_LIMIT = 10
 ORBIT_DURATION_MINUTES = 90
 ORBIT_SAMPLE_MINUTES = 5
 
@@ -68,7 +67,7 @@ def get_position(satellite, time):
 def gen_orbit_paths(satellites, start_time):
     orbit_paths = []
     
-    for object_data, satellite in satellites[:VISUALIZATION_LIMIT]:
+    for object_data, satellite in satellites:
         points = []
         
         for minute in range(0,ORBIT_DURATION_MINUTES+1,ORBIT_SAMPLE_MINUTES):
@@ -240,11 +239,23 @@ def find_conjunctions():
                 )
             })
 
+    conjunction_object_ids = {
+        str(norad_id)
+        for event in conjunctions
+        for norad_id in (event["norad_a"], event["norad_b"])
+    }
+
+    conjunction_satellites = [
+        (object_data, satellite)
+        for object_data, satellite in satellites
+        if str(object_data["NORAD_CAT_ID"]) in conjunction_object_ids
+    ]
+
     return {
         "objects_tracked": len(objects),
         "conjunctions": conjunctions,
         "orbit_paths": gen_orbit_paths(
-            satellites,
+            conjunction_satellites,
             now
         )
     }
