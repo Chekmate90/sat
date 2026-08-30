@@ -135,7 +135,13 @@ def find_conjunctions():
         objects = response.json()[:OBJECT_LIMIT]
     except requests.RequestException as e:
         print("CelesTrak request failed:", e)
-        return None
+        print("Loading sample data...")
+        try:
+            with open("sample_data_feb142026.json", "r") as f:
+                objects = json.load(f)[:OBJECT_LIMIT]
+        except Exception as e2:
+             print("Failed to load sample data:", e2)
+             return None
         
     satellites = [(obj, create_satellite(obj)) for obj in objects]
     now = datetime.now(timezone.utc)
