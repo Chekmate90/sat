@@ -1,468 +1,256 @@
+// live UTC clock
+function tickClock() {
+  const el = document.getElementById('utc-clock');
+  const now = new Date();
+  el.textContent = now.toISOString().substring(11, 19) + ' Z';
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+// global state
 let availableOrbitPaths = [];
-let currentSort = {
-  key: "time_until_seconds",
-  direction: "asc",
-};
+let currentConjunctions = [];
+
+// API CALLS (From your original code)
 
 async function refreshAnalysis() {
   const status = document.getElementById("status");
-
   const button = document.getElementById("refresh-button");
 
+  status.className = 'status busy';
   status.textContent = "Running orbital conjunction analysis...";
-
   button.disabled = true;
-
   button.textContent = "Analyzing...";
 
   try {
-    const response = await fetch("/refresh", {
-      method: "POST",
-    });
+    const response = await fetch("/refresh", { method: "POST" });
 
     if (!response.ok) {
       throw new Error(`HTTP error: ${response.status}`);
     }
 
     const result = await response.json();
-
     console.log("Refresh result:", result);
-
-    /*Load newly generated results*/
 
     await loadConjunctions();
     await loadOrbits();
 
+    status.className = 'status ok';
     status.textContent = `Analysis complete — ${result.events_found} conjunctions found.`;
   } catch (error) {
     console.error(error);
-
+    status.className = 'status';
     status.textContent = "Analysis failed. Showing previous results.";
-
-    /*Load cached results*/
-
     await loadConjunctions();
   } finally {
     button.disabled = false;
-
     button.textContent = "Refresh Analysis";
   }
 }
 
-/* ==================================================
-        LOAD ORBITS
-    ================================================== */
-
 async function loadOrbits() {
   const chart = document.getElementById("orbit-chart");
-
   try {
     const response = await fetch("/orbits");
-
-    if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
 
     const result = await response.json();
     availableOrbitPaths = result.orbit_paths;
     renderOrbitChart(availableOrbitPaths);
   } catch (error) {
     console.error("Failed to load orbit paths:", error);
-
-    chart.innerHTML = `
-      <div class="empty">
-        Failed to load orbit visualization.
-      </div>
-    `;
+    chart.innerHTML = `<div class="empty">Failed to load orbit visualization.</div>`;
   }
 }
 
-/* ==================================================
-        RENDER ORBITS
-    ================================================== */
+async function loadConjunctions() {
+  try {
+    const response = await fetch("/conjunctions");
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+
+    const result = await response.json();
+    currentConjunctions = result.conjunctions;
+    
+    // Update objects tracked
+    document.getElementById("objects-count").textContent = result.objects_tracked;
+    
+    updateDashboard(currentConjunctions);
+  } catch (error) {
+    console.error(error);
+    document.getElementById("status").textContent = "Failed to load conjunction data.";
+  }
+}
+
+ //  UI UPDATES & RENDERING
+
+function updateDashboard(data) {
+  const table = document.getElementById("conjunctions");
+  table.innerHTML = "";
+
+  // Conjunction count
+  document.getElementById("conjunction-count").textContent = data.length;
+
+  // Risk counters
+  let critical = 0, high = 0, medium = 0, low = 0;
+
+  for (const event of data) {
+    if (event.risk === "CRITICAL") critical++;
+    else if (event.risk === "HIGH") high++;
+    else if (event.risk === "MEDIUM") medium++;
+    else if (event.risk === "LOW") low++;
+  }
+
+  // Update risk cards
+  document.getElementById("critical-count").textContent = critical;
+  document.getElementById("high-count").textContent = high;
+  document.getElementById("medium-count").textContent = medium;
+  document.getElementById("low-count").textContent = low;
+
+  // Empty state
+  if (data.length === 0) {
+    table.innerHTML = `<tr><td colspan="6" class="empty">No conjunctions found.</td></tr>`;
+    return;
+  }
+
+  // Create table rows matching the new UI style
+  for (const event of data) {
+    const row = document.createElement("tr");
+    
+    // Storing data attributes for the search filter
+    row.setAttribute('data-a', event.object_a);
+    row.setAttribute('data-b', event.object_b);
+
+    row.innerHTML = `
+      <td class="dim">${event.id}</td>
+      <td>${event.object_a}</td>
+      <td>${event.object_b}</td>
+      <td>${event.distance_km} km</td>
+      <td>${formatTime(event.time_until_seconds)}</td>
+      <td><span class="risk-badge risk-${event.risk}">${event.risk}</span></td>
+    `;
+    table.appendChild(row);
+  }
+}
 
 function renderOrbitChart(orbitPaths) {
   const chart = document.getElementById("orbit-chart");
 
   if (!Array.isArray(orbitPaths) || orbitPaths.length === 0) {
     Plotly.purge(chart);
-
-    chart.innerHTML = `
-      <div class="empty">
-        Run an analysis to load orbit paths.
-      </div>
-    `;
-
+    chart.innerHTML = `<div class="empty">Run an analysis to load orbit paths.</div>`;
     return;
   }
 
+  // Mapping your backend data to the new transparent UI aesthetic
   const traces = orbitPaths.map((orbit) => {
     return {
       type: "scatter",
       mode: "lines+markers",
       name: orbit.name,
-
       x: orbit.points.map((point) => point.x),
       y: orbit.points.map((point) => point.y),
-
       text: orbit.points.map((point) => {
         const time = new Date(point.time).toLocaleString();
-
         return `${orbit.name}<br>NORAD: ${orbit.norad_id}<br>${time}`;
       }),
-
-      hovertemplate:
-        "%{text}<br>X: %{x:.0f} km<br>Y: %{y:.0f} km<extra></extra>",
-
-      line: {
-        width: 2,
-      },
-
-      marker: {
-        size: 4,
-      },
+      hovertemplate: "%{text}<br>X: %{x:.0f} km<br>Y: %{y:.0f} km<extra></extra>",
+      line: { width: 1.2, color: 'rgba(192, 132, 252, 0.6)' },
+      marker: { size: 4, color: '#38bdf8' },
     };
   });
 
   const earthRadius = 6378;
 
   const layout = {
-    paper_bgcolor: "#120624",
-    plot_bgcolor: "#120624",
-
-    font: {
-      color: "#d9f7f3",
-    },
-
-    margin: {
-      left: 70,
-      right: 30,
-      top: 30,
-      bottom: 70,
-    },
-
-    xaxis: {
-      title: "X position (km)",
-      gridcolor: "#3e4455",
-      zerolinecolor: "#71b6ff",
-      scaleanchor: "y",
-      scaleratio: 1,
-    },
-
-    yaxis: {
-      title: "Y position (km)",
-      gridcolor: "#3e4455",
-      zerolinecolor: "#71b6ff",
-    },
-
-    legend: {
-      orientation: "h",
-      y: -0.2,
-    },
-
+    paper_bgcolor: 'transparent',
+    plot_bgcolor: 'transparent',
+    font: { family: 'JetBrains Mono, monospace', color: '#94a3b8', size: 11 },
+    margin: { l: 50, r: 30, t: 20, b: 40 },
+    xaxis: { title: 'X (km)', zeroline: false, gridcolor: 'rgba(139, 92, 246, 0.15)', scaleanchor: 'y' },
+    yaxis: { title: 'Y (km)', zeroline: false, gridcolor: 'rgba(139, 92, 246, 0.15)' },
+    showlegend: false,
     shapes: [
       {
-        type: "circle",
-        xref: "x",
-        yref: "y",
-        x0: -earthRadius,
-        y0: -earthRadius,
-        x1: earthRadius,
-        y1: earthRadius,
-        fillcolor: "#235b8c",
-        line: {
-          color: "#71b6ff",
-          width: 2,
-        },
+        type: "circle", xref: "x", yref: "y",
+        x0: -earthRadius, y0: -earthRadius, x1: earthRadius, y1: earthRadius,
+        fillcolor: "rgba(14, 28, 64, 0.8)",
+        line: { color: "#38bdf8", width: 1.5 },
         layer: "below",
       },
     ],
   };
 
-  const config = {
-    responsive: true,
-    displaylogo: false,
-    scrollZoom: true,
-  };
-
+  const config = { responsive: true, displayModeBar: false };
   Plotly.newPlot(chart, traces, layout, config);
 }
 
-/* ==================================================
-        LOAD CONJUNCTIONS
-        ONLY READS CACHED RESULTS
-    ================================================== */
-
-async function loadConjunctions() {
-  try {
-    const response = await fetch("/conjunctions");
-
-    if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    // Get the actual conjunction array
-    conjunctionData = result.conjunctions;
-    const data = getSortedConjunctions();
-
-    // Update objects tracked
-    document.getElementById("objects-count").textContent =
-      result.objects_tracked;
-
-    // Update dashboard
-    updateDashboard(data);
-
-    document.getElementById("status").textContent =
-      `${data.length} conjunctions found`;
-  } catch (error) {
-    console.error(error);
-
-    document.getElementById("status").textContent =
-      "Failed to load conjunction data.";
-  }
-}
-
-/* ==================================================
-        ARRANGES CONJUCTIONS
-    ================================================== */
-
-function sortConjunctions(key) {
-  if (currentSort.key === key) {
-    currentSort.direction = currentSort.direction === "asc" ? "desc" : "asc";
-  } else {
-    currentSort.key = key;
-    currentSort.direction = "asc";
-  }
-
-  updateDashboard(getSortedConjunctions());
-}
-
-function getSortedConjunctions() {
-  const direction = currentSort.direction === "asc" ? 1 : -1;
-  const key = currentSort.key;
-
-  return [...conjunctionData].sort((a, b) => {
-    const valueA = a[key];
-    const valueB = b[key];
-
-    if (typeof valueA === "string") {
-      return valueA.localeCompare(valueB) * direction;
-    }
-
-    return (valueA - valueB) * direction;
-  });
-}
-
-/* ==================================================
-        UPDATE DASHBOARD
-    ================================================== */
-
-function updateDashboard(data) {
-  const table = document.getElementById("conjunctions");
-
-  table.innerHTML = "";
-
-  /*
-   * Conjunction count
-   */
-
-  document.getElementById("conjunction-count").textContent = data.length;
-
-  /*
-   * Risk counters
-   */
-
-  let critical = 0;
-
-  let high = 0;
-
-  let medium = 0;
-
-  let low = 0;
-
-  for (const event of data) {
-    if (event.risk === "CRITICAL") {
-      critical++;
-    } else if (event.risk === "HIGH") {
-      high++;
-    } else if (event.risk === "MEDIUM") {
-      medium++;
-    } else if (event.risk === "LOW") {
-      low++;
-    }
-  }
-
-  /*
-   * Update risk cards
-   */
-
-  document.getElementById("critical-count").textContent = critical;
-
-  document.getElementById("high-count").textContent = high;
-
-  document.getElementById("medium-count").textContent = medium;
-
-  document.getElementById("low-count").textContent = low;
-
-  /*
-   * Empty state
-   */
-
-  if (data.length === 0) {
-    table.innerHTML = `
-
-                <tr>
-
-                    <td
-                        colspan="6"
-                        class="empty"
-                    >
-                        No conjunctions found.
-                    </td>
-
-                </tr>
-
-            `;
-
-    return;
-  }
-
-  /*
-   * Create table rows
-   */
-
-  for (const event of data) {
-    const row = document.createElement("tr");
-
-    const riskClass = getRiskClass(event.risk);
-
-    row.classList.add("conjunction-row");
-
-    row.addEventListener("click", () => {
-      selectConjunction(event, row);
-    });
-
-    row.innerHTML = `
-                <td>
-                    ${event.id}
-                </td>
-                <td>
-                    ${event.object_a}
-                </td>
-                <td>
-                    ${event.object_b}
-                </td>
-                <td>
-                    ${event.distance_km} km
-                </td>
-                <td>
-                    ${formatTime(event.time_until_seconds)}
-                </td>
-                <td class="risk ${riskClass}">
-                    ${event.risk}
-                </td>
-            `;
-    table.appendChild(row);
-  }
-}
-
-/* ==================================================
-        SELECTION OF ROWS
-    ================================================== */
-function selectConjunction(event, selectedRow) {
-  const selectedOrbits = availableOrbitPaths.filter((orbit) => {
-    const noradId = String(orbit.norad_id);
-
-    return (
-      noradId === String(event.norad_a) || noradId === String(event.norad_b)
-    );
-  });
-
-  document.querySelectorAll(".conjunction-row").forEach((row) => {
-    row.classList.remove("selected");
-  });
-
-  selectedRow.classList.add("selected");
-
-  renderOrbitChart(selectedOrbits);
-
-  document.getElementById("status").textContent =
-    `Showing ${event.object_a} and ${event.object_b} — closest distance: ${event.distance_km} km`;
-}
-
-/* ==================================================
-        FORMAT TIME
-    ================================================== */
+//        HELPERS & UTILS
 
 function formatTime(seconds) {
-  if (seconds < 0) {
-    return "Passed";
-  }
-
+  if (seconds < 0) return "Passed";
   const minutes = Math.floor(seconds / 60);
-
   const hours = Math.floor(minutes / 60);
-
   const days = Math.floor(hours / 24);
-
   const years = Math.floor(days / 365);
-
+  
   const remainingDays = days % 365;
-
   const remainingHours = hours % 24;
-
   const remainingMinutes = minutes % 60;
 
-  /*Years*/
-  if (years > 0) {
-    return `${years}y ${remainingDays}d`;
-  }
-
-  /*Days*/
-  if (days > 0) {
-    return `${days}d ${remainingHours}h`;
-  }
-
-  /*Hours*/
-  if (hours > 0) {
-    return `${hours}h ${remainingMinutes}m`;
-  }
-
-  /* Minutes*/
+  if (years > 0) return `${years}y ${remainingDays}d`;
+  if (days > 0) return `${days}d ${remainingHours}h`;
+  if (hours > 0) return `${hours}h ${remainingMinutes}m`;
   return `${minutes}m`;
 }
 
-/* ==================================================
-        RISK CSS CLASS
-    ================================================== */
+//        SEARCH FUNCTIONALITY (From new UI)
 
-function getRiskClass(risk) {
-  switch (risk) {
-    case "CRITICAL":
-      return "risk-critical";
+const searchInput = document.getElementById('object-search');
+const clearBtn = document.getElementById('search-clear');
 
-    case "HIGH":
-      return "risk-high";
+function applyFilter(query) {
+  const q = query.trim().toLowerCase();
+  const rows = document.querySelectorAll('#conjunctions tr[data-a]');
+  let visibleCount = 0;
 
-    case "MEDIUM":
-      return "risk-medium";
-
-    case "LOW":
-      return "risk-low";
-
-    case "SAFE":
-      return "risk-safe";
-
-    default:
-      return "";
+  if (!q) {
+    rows.forEach(r => { 
+        r.style.display = ''; 
+        r.style.background = '';
+    });
+    return;
   }
+
+  rows.forEach(r => {
+    const a = r.getAttribute('data-a').toLowerCase();
+    const b = r.getAttribute('data-b').toLowerCase();
+    const isMatch = a.includes(q) || b.includes(q);
+    
+    if (isMatch) {
+      r.style.display = '';
+      r.style.background = 'rgba(56, 189, 248, 0.15)';
+      visibleCount++;
+    } else {
+      r.style.display = 'none';
+      r.style.background = '';
+    }
+  });
 }
 
-/* ==================================================
-        LOAD CACHED RESULTS ON PAGE OPEN
-    ================================================== */
+searchInput.addEventListener('input', (e) => {
+  const value = e.target.value;
+  clearBtn.classList.toggle('visible', value.length > 0);
+  applyFilter(value);
+});
+
+clearBtn.addEventListener('click', () => {
+  searchInput.value = '';
+  clearBtn.classList.remove('visible');
+  applyFilter('');
+  searchInput.focus();
+});
+
+//        INITIALIZE
 
 loadConjunctions();
 loadOrbits();
