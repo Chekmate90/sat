@@ -1,4 +1,5 @@
 let availableOrbitPaths = [];
+let conjunctionData = [];
 let currentSort = {
   key: "time_until_seconds",
   direction: "asc",
@@ -6,17 +7,24 @@ let currentSort = {
 
 async function refreshAnalysis() {
   const status = document.getElementById("status");
-
   const button = document.getElementById("refresh-button");
+  const objectsScanned = document.getElementById("objects-slider").value;
+  const futureHours = document.getElementById("future-slider").value;
 
-  status.textContent = "Running orbital conjunction analysis...";
+  status.textContent =
+    `Scanning ${objectsScanned} objects ${futureHours} ${futureHours === "1" ? "hour" : "hours"} into the future...`;
 
   button.disabled = true;
 
   button.textContent = "Analyzing...";
 
   try {
-    const response = await fetch("/refresh", {
+    const params = new URLSearchParams({
+      objects_scanned: objectsScanned,
+      future_hours: futureHours,
+    });
+
+    const response = await fetch(`/refresh?${params}`, {
       method: "POST",
     });
 
@@ -48,6 +56,37 @@ async function refreshAnalysis() {
     button.textContent = "Refresh Analysis";
   }
 }
+
+function updateSliderValue(slider, output, formatter) {
+  output.textContent = formatter(slider.value);
+  const progress =
+    ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+  slider.style.setProperty("--slider-progress", `${progress}%`);
+}
+
+const objectsSlider = document.getElementById("objects-slider");
+const objectsSliderValue = document.getElementById("objects-slider-value");
+const futureSlider = document.getElementById("future-slider");
+const futureSliderValue = document.getElementById("future-slider-value");
+
+objectsSlider.addEventListener("input", () => {
+  updateSliderValue(objectsSlider, objectsSliderValue, (value) => value);
+});
+
+futureSlider.addEventListener("input", () => {
+  updateSliderValue(
+    futureSlider,
+    futureSliderValue,
+    (value) => `${value} ${value === "1" ? "hour" : "hours"}`,
+  );
+});
+
+updateSliderValue(objectsSlider, objectsSliderValue, (value) => value);
+updateSliderValue(
+  futureSlider,
+  futureSliderValue,
+  (value) => `${value} ${value === "1" ? "hour" : "hours"}`,
+);
 
 /* ==================================================
         LOAD ORBITS

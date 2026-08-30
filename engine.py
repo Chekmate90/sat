@@ -1,3 +1,4 @@
+import json
 import math
 from datetime import datetime, timezone, timedelta
 from itertools import combinations
@@ -10,13 +11,13 @@ from sgp4 import omm
 URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=json"
 
 # Because of our O(n) filters, we can significantly increase the object limit!
-OBJECT_LIMIT = 500 
+OBJECT_LIMIT = 200
 
 SCAN_MINUTES = 1440 # Scan 24 hours into the future for the MVP
 COARSE_STEP = 5
 FINE_STEP_SECONDS = 10
 
-SCREENING_THRESHOLD = 150 # km distance to flag as a conjunction
+SCREENING_THRESHOLD = 120 # km distance to flag as a conjunction
 
 # Multi-Tiered Filter Thresholds
 RADIAL_BUFFER_KM = 20
@@ -127,18 +128,18 @@ def calculate_moid(sat_a, sat_b, now):
 
 # --- MAIN ENGINE LOOP ---
 
-def find_conjunctions():
+def find_conjunctions(object_limit=OBJECT_LIMIT, scan_minutes=SCAN_MINUTES):
     try:
         print("Downloading TLEs from CelesTrak...")
         response = requests.get(URL, timeout=15)
         response.raise_for_status()
-        objects = response.json()[:OBJECT_LIMIT]
+        objects = response.json()[:object_limit]
     except requests.RequestException as e:
         print("CelesTrak request failed:", e)
         print("Loading sample data...")
         try:
             with open("sample_data_feb142026.json", "r") as f:
-                objects = json.load(f)[:OBJECT_LIMIT]
+                objects = json.load(f)[:object_limit]
         except Exception as e2:
              print("Failed to load sample data:", e2)
              return None
@@ -181,9 +182,9 @@ def find_conjunctions():
     # 2. THE TIME LOOP & SPATIAL HASHING
     coarse_results = {}
     
-    print(f"Initiating Spatial Hashing Loop for next {SCAN_MINUTES} minutes...")
+    print(f"Initiating Spatial Hashing Loop for next {scan_minutes} minutes...")
     
-    for minute in range(0, SCAN_MINUTES + 1, COARSE_STEP):
+    for minute in range(0, scan_minutes + 1, COARSE_STEP):
         future = now + timedelta(minutes=minute)
         grid = {}
         positions = {}

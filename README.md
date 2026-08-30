@@ -39,7 +39,7 @@ uvicorn main:app --reload
 
 Then open the dashboard at [http://127.0.0.1:8000/dashboard](http://127.0.0.1:8000/dashboard).
 
-Press **Refresh Analysis** to download current CelesTrak data and run the conjunction analysis. The analysis may take a short while because the application compares many object pairs.
+Choose how many objects to scan and how far into the future to search with the dashboard sliders, then press **Refresh Analysis**. The analysis may take a short while because the application compares many object pairs.
 
 ## API endpoints
 
@@ -54,5 +54,5 @@ Interactive API documentation is available at [http://127.0.0.1:8000/docs](http:
 ## Notes
 
 - Analysis results are cached in memory and are cleared when the server restarts.
-- The current configuration analyzes up to 120 recently added objects over a 60-minute window.
+- The dashboard can analyze 20–200 recently added objects over a 1–24 hour window.
 - CelesTrak availability is required when starting a new analysis.

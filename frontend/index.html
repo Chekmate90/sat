@@ -70,6 +70,42 @@
       <!-- ================= CONTROLS ================= -->
 
       <div class="controls">
+        <div class="slider-control">
+          <div class="slider-heading">
+            <label for="objects-slider">Objects scanned</label>
+            <output id="objects-slider-value" for="objects-slider">200</output>
+          </div>
+          <input
+            id="objects-slider"
+            type="range"
+            min="20"
+            max="200"
+            step="10"
+            value="200"
+          />
+          <div class="slider-range" aria-hidden="true">
+            <span>20</span><span>200</span>
+          </div>
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-heading">
+            <label for="future-slider">Time in future</label>
+            <output id="future-slider-value" for="future-slider">24 hours</output>
+          </div>
+          <input
+            id="future-slider"
+            type="range"
+            min="1"
+            max="24"
+            step="1"
+            value="24"
+          />
+          <div class="slider-range" aria-hidden="true">
+            <span>1 hour</span><span>24 hours</span>
+          </div>
+        </div>
+
         <button id="refresh-button" onclick="refreshAnalysis()">
           Refresh Analysis
         </button>

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from engine import find_conjunctions
 from fastapi.staticfiles import StaticFiles
@@ -41,13 +41,19 @@ def conjunctions():
 
 
 @app.post("/refresh")
-def refresh():
+def refresh(
+    objects_scanned: int = Query(200, ge=20, le=200),
+    future_hours: int = Query(24, ge=1, le=24),
+):
 
     global latest_results
     global latest_orbit_paths
     global objects_tracked
 
-    result = find_conjunctions()
+    result = find_conjunctions(
+        object_limit=objects_scanned,
+        scan_minutes=future_hours * 60,
+    )
 
     # CelesTrak request failed
     if result is None:
@@ -63,6 +69,7 @@ def refresh():
     return {
         "message": "Conjunction analysis completed",
         "objects_tracked": objects_tracked,
+        "future_hours": future_hours,
         "events_found": len(latest_results)
     }
 
