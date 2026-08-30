@@ -11,7 +11,7 @@ from sgp4 import omm
 URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=json"
 
 # Because of our O(n) filters, we can significantly increase the object limit!
-OBJECT_LIMIT = 200
+OBJECT_LIMIT = 500
 
 SCAN_MINUTES = 1440 # Scan 24 hours into the future for the MVP
 COARSE_STEP = 5

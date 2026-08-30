@@ -42,7 +42,7 @@ def conjunctions():
 
 @app.post("/refresh")
 def refresh(
-    objects_scanned: int = Query(200, ge=20, le=200),
+    objects_scanned: int = Query(500, ge=20, le=500),
     future_hours: int = Query(24, ge=1, le=24),
 ):
 
