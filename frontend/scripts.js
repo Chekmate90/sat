@@ -370,6 +370,7 @@ function renderOrbitChart(orbitPaths) {
   const layout = {
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
+    dragmode: 'pan',
     font: { family: 'JetBrains Mono, monospace', color: '#94a3b8', size: 11 },
     margin: { l: 50, r: 30, t: 20, b: 40 },
     xaxis: { title: 'X (km)', zeroline: false, gridcolor: 'rgba(139, 92, 246, 0.15)', scaleanchor: 'y' },
@@ -386,7 +387,15 @@ function renderOrbitChart(orbitPaths) {
     ],
   };
 
-  const config = { responsive: true, displayModeBar: false };
+  const config = {
+    responsive: true,
+    displayModeBar: true,
+    displaylogo: false,
+    scrollZoom: true,
+    doubleClick: 'reset+autosize',
+    showTips: true,
+    modeBarButtonsToRemove: ['select2d', 'lasso2d'],
+  };
   Plotly.newPlot(chart, traces, layout, config);
 }
 

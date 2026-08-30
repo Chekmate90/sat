@@ -844,6 +844,29 @@ button#refresh-button:disabled {
   padding: 120px 0;
 }
 
+#orbit-chart .modebar {
+  top: 12px !important;
+  right: 20px !important;
+  padding: 4px 5px !important;
+  border: 1px solid var(--hairline-bright);
+  border-radius: 4px;
+  background: rgba(6, 11, 20, 0.9) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+#orbit-chart .modebar-group {
+  background: transparent !important;
+}
+
+#orbit-chart .modebar-btn path {
+  fill: var(--text-dim) !important;
+}
+
+#orbit-chart .modebar-btn:hover path,
+#orbit-chart .modebar-btn.active path {
+  fill: var(--sky) !important;
+}
+
 .empty {
   text-align: center;
   color: var(--text-dim);
