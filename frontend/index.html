@@ -39,8 +39,12 @@
         <p class="sub">High-precision trajectory screening, proximity analysis, and collision avoidance operations for orbital payloads.</p>
       </div>
       <div class="clock-block">
-        <div class="clock-label">MISSION TIME (UTC)</div>
-        <div class="clock-value" id="utc-clock">00:00:00 Z</div>
+        <div class="clock-label">MISSION TIME</div>
+        <div class="clock-options" role="group" aria-label="Clock timezone">
+          <button type="button" class="clock-option active" data-clock-mode="local">Local</button>
+          <button type="button" class="clock-option" data-clock-mode="utc">UTC</button>
+        </div>
+        <div class="clock-value" id="dashboard-clock">00:00:00</div>
       </div>
     </div>
   </div>

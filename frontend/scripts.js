@@ -1,9 +1,47 @@
-// live UTC clock
+// Live clock with selectable local and UTC timezones.
+const localClockFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  timeZoneName: 'short',
+});
+
+const utcClockFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  timeZone: 'UTC',
+  timeZoneName: 'short',
+});
+
+let clockMode = localStorage.getItem('clockMode') === 'utc' ? 'utc' : 'local';
+
 function tickClock() {
-  const el = document.getElementById('utc-clock');
-  const now = new Date();
-  el.textContent = now.toISOString().substring(11, 19) + ' Z';
+  const el = document.getElementById('dashboard-clock');
+  if (el) {
+    const formatter = clockMode === 'utc' ? utcClockFormatter : localClockFormatter;
+    el.textContent = formatter.format(new Date());
+  }
 }
+
+function setClockMode(mode) {
+  clockMode = mode === 'utc' ? 'utc' : 'local';
+  localStorage.setItem('clockMode', clockMode);
+
+  document.querySelectorAll('[data-clock-mode]').forEach((button) => {
+    const isActive = button.dataset.clockMode === clockMode;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-pressed', String(isActive));
+  });
+
+  tickClock();
+}
+
+document.querySelectorAll('[data-clock-mode]').forEach((button) => {
+  button.addEventListener('click', () => setClockMode(button.dataset.clockMode));
+});
+
+setClockMode(clockMode);
 tickClock();
 setInterval(tickClock, 1000);
 
