@@ -53,7 +53,7 @@ def refresh():
     if result is None:
         raise HTTPException(
             status_code=503,
-            detail="Unable to retrieve satellite data from CelesTrak. Please try again."
+            detail="Unable to retrieve satellite data from CelesTrak or from local data file(sample_data_feb142026.json). Please try again."
         )
 
     latest_results = result["conjunctions"]
