@@ -48,6 +48,11 @@ setInterval(tickClock, 1000);
 // global state
 let availableOrbitPaths = [];
 let currentConjunctions = [];
+let selectedConjunctionId = null;
+let currentSort = {
+  key: 'time_until_seconds',
+  direction: 'asc',
+};
 
 // API CALLS (From your original code)
 
@@ -146,18 +151,88 @@ async function loadConjunctions() {
 
     const result = await response.json();
     currentConjunctions = result.conjunctions;
+    selectedConjunctionId = null;
 
     // Update objects tracked
     document.getElementById("objects-count").textContent = result.objects_tracked;
 
-    updateDashboard(currentConjunctions);
+    updateDashboard(getSortedConjunctions());
   } catch (error) {
     console.error(error);
     document.getElementById("status").textContent = "Failed to load conjunction data.";
   }
 }
 
- //  UI UPDATES & RENDERING
+// SORTING
+
+const riskOrder = {
+  CRITICAL: 0,
+  HIGH: 1,
+  MEDIUM: 2,
+  LOW: 3,
+  SAFE: 4,
+};
+
+function sortConjunctions(key) {
+  if (currentSort.key === key) {
+    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentSort.key = key;
+    currentSort.direction = 'asc';
+  }
+
+  updateSortIndicators();
+  updateDashboard(getSortedConjunctions());
+  applyFilter(searchInput.value);
+}
+
+function getSortedConjunctions() {
+  const direction = currentSort.direction === 'asc' ? 1 : -1;
+  const key = currentSort.key;
+
+  return [...currentConjunctions].sort((eventA, eventB) => {
+    let valueA = eventA[key];
+    let valueB = eventB[key];
+
+    if (key === 'risk') {
+      valueA = riskOrder[valueA] ?? Number.MAX_SAFE_INTEGER;
+      valueB = riskOrder[valueB] ?? Number.MAX_SAFE_INTEGER;
+    }
+
+    if (typeof valueA === 'string' || typeof valueB === 'string') {
+      return String(valueA).localeCompare(String(valueB)) * direction;
+    }
+
+    return (Number(valueA) - Number(valueB)) * direction;
+  });
+}
+
+function updateSortIndicators() {
+  document.querySelectorAll('.sort-button').forEach((button) => {
+    const isActive = button.dataset.sortKey === currentSort.key;
+    const header = button.closest('th');
+    const indicator = button.querySelector('.sort-indicator');
+
+    header.setAttribute(
+      'aria-sort',
+      isActive
+        ? (currentSort.direction === 'asc' ? 'ascending' : 'descending')
+        : 'none',
+    );
+    button.classList.toggle('active', isActive);
+    indicator.textContent = isActive
+      ? (currentSort.direction === 'asc' ? '↑' : '↓')
+      : '↕';
+  });
+}
+
+document.querySelectorAll('.sort-button').forEach((button) => {
+  button.addEventListener('click', () => sortConjunctions(button.dataset.sortKey));
+});
+
+updateSortIndicators();
+
+// UI UPDATES & RENDERING
 
 function updateDashboard(data) {
   const table = document.getElementById("conjunctions");
@@ -195,6 +270,25 @@ function updateDashboard(data) {
     // Storing data attributes for the search filter
     row.setAttribute('data-a', event.object_a);
     row.setAttribute('data-b', event.object_b);
+    row.classList.add('conjunction-row');
+    row.tabIndex = 0;
+    row.setAttribute(
+      'aria-label',
+      `Show orbits for ${event.object_a} and ${event.object_b}`,
+    );
+
+    if (event.id === selectedConjunctionId) {
+      row.classList.add('selected');
+      row.setAttribute('aria-selected', 'true');
+    }
+
+    row.addEventListener('click', () => selectConjunction(event, row));
+    row.addEventListener('keydown', (keyboardEvent) => {
+      if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
+        keyboardEvent.preventDefault();
+        selectConjunction(event, row);
+      }
+    });
 
     row.innerHTML = `
       <td class="dim">${event.id}</td>
@@ -206,6 +300,42 @@ function updateDashboard(data) {
     `;
     table.appendChild(row);
   }
+}
+
+function selectConjunction(event, selectedRow) {
+  const status = document.getElementById('status');
+
+  if (selectedConjunctionId === event.id) {
+    selectedConjunctionId = null;
+    selectedRow.classList.remove('selected');
+    selectedRow.setAttribute('aria-selected', 'false');
+    renderOrbitChart(availableOrbitPaths);
+    status.className = 'status ok';
+    status.textContent = `${currentConjunctions.length} conjunctions found — showing all orbits.`;
+    return;
+  }
+
+  const selectedOrbits = availableOrbitPaths.filter((orbit) => {
+    const noradId = String(orbit.norad_id);
+    return (
+      noradId === String(event.norad_a) ||
+      noradId === String(event.norad_b)
+    );
+  });
+
+  document.querySelectorAll('.conjunction-row').forEach((row) => {
+    row.classList.remove('selected');
+    row.setAttribute('aria-selected', 'false');
+  });
+
+  selectedConjunctionId = event.id;
+  selectedRow.classList.add('selected');
+  selectedRow.setAttribute('aria-selected', 'true');
+  renderOrbitChart(selectedOrbits);
+
+  status.className = 'status ok';
+  status.textContent =
+    `Showing ${event.object_a} and ${event.object_b} — closest distance: ${event.distance_km} km.`;
 }
 
 function renderOrbitChart(orbitPaths) {
