@@ -346,6 +346,7 @@ function renderOrbitChart(orbitPaths) {
     chart.innerHTML = `<div class="empty">Run an analysis to load orbit paths.</div>`;
     return;
   }
+    chart.innerHTML = "";
 
   // Mapping your backend data to the new transparent UI aesthetic
   const traces = orbitPaths.map((orbit) => {
