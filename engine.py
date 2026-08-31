@@ -1,5 +1,6 @@
-import json
 import math
+import json
+import concurrent.futures
 from datetime import datetime, timezone, timedelta
 from itertools import combinations
 
@@ -10,8 +11,8 @@ from sgp4 import omm
 # --- CONFIGURATION & CONSTANTS ---
 URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=json"
 
-# Because of our O(n) filters, we can significantly increase the object limit!
-OBJECT_LIMIT = 500
+# With multi-processing and O(n) filters, we can process a large dataset
+OBJECT_LIMIT = 1000
 
 SCAN_MINUTES = 1440 # Scan 24 hours into the future for the MVP
 COARSE_STEP = 5
@@ -21,9 +22,9 @@ SCREENING_THRESHOLD = 120 # km distance to flag as a conjunction
 
 # Multi-Tiered Filter Thresholds
 RADIAL_BUFFER_KM = 20
-MOID_THRESHOLD_KM = 150 
+MOID_THRESHOLD_KM = 120 
 EARTH_RADIUS_KM = 6371.0
-CELL_SIZE = 150 # Spatial hashing 3D grid size (km)
+CELL_SIZE = 120 # Spatial hashing 3D grid size (km)
 
 ORBIT_DURATION_MINUTES = 90
 ORBIT_SAMPLE_MINUTES = 5
@@ -126,20 +127,69 @@ def calculate_moid(sat_a, sat_b, now):
     return min_dist
 
 
+# --- MULTI-PROCESSING HELPER ---
+
+def process_time_step(minute, now, active_satellites, valid_pair_ids):
+    """Standalone function to process a single time step across CPU cores."""
+    future = now + timedelta(minutes=minute)
+    grid = {}
+    positions = {}
+    step_results = {}
+    
+    # Hash active satellites into the 3D grid
+    for norad_id, (obj, sat) in active_satellites.items():
+        pos = get_position(sat, future)
+        if pos:
+            positions[norad_id] = pos
+            # 150km cells
+            cell = (int(pos[0] // CELL_SIZE), int(pos[1] // CELL_SIZE), int(pos[2] // CELL_SIZE)) 
+            if cell not in grid: grid[cell] = []
+            grid[cell].append(norad_id)
+            
+    # Check for collisions in same and adjacent cells
+    checked_this_step = set()
+    for (cx, cy, cz), sats_in_cell in grid.items():
+        neighbors = [(cx+dx, cy+dy, cz+dz) for dx in [-1,0,1] for dy in [-1,0,1] for dz in [-1,0,1]]
+        
+        for neighbor in neighbors:
+            if neighbor in grid:
+                for id_a in sats_in_cell:
+                    for id_b in grid[neighbor]:
+                        if id_a == id_b: continue
+                        
+                        pair_key = tuple(sorted([id_a, id_b]))
+                        if pair_key in checked_this_step: continue
+                        checked_this_step.add(pair_key)
+                        
+                        # Execute Math ONLY if they passed geometry filters
+                        if pair_key in valid_pair_ids:
+                            dist = calculate_distance(positions[id_a], positions[id_b])
+                            if dist <= SCREENING_THRESHOLD: 
+                                if pair_key not in step_results or dist < step_results[pair_key]["distance"]:
+                                    step_results[pair_key] = {
+                                        "sat_a": active_satellites[id_a],
+                                        "sat_b": active_satellites[id_b],
+                                        "time": future,
+                                        "distance": dist
+                                    }
+    return step_results
+
+
 # --- MAIN ENGINE LOOP ---
 
-def find_conjunctions(object_limit=OBJECT_LIMIT, scan_minutes=SCAN_MINUTES):
+def find_conjunctions():
+    objects = []
     try:
         print("Downloading TLEs from CelesTrak...")
         response = requests.get(URL, timeout=15)
         response.raise_for_status()
-        objects = response.json()[:object_limit]
+        objects = response.json()[:OBJECT_LIMIT]
     except requests.RequestException as e:
         print("CelesTrak request failed:", e)
         print("Loading sample data...")
         try:
             with open("sample_data_feb142026.json", "r") as f:
-                objects = json.load(f)[:object_limit]
+                objects = json.load(f)[:OBJECT_LIMIT]
         except Exception as e2:
              print("Failed to load sample data:", e2)
              return None
@@ -179,53 +229,26 @@ def find_conjunctions(object_limit=OBJECT_LIMIT, scan_minutes=SCAN_MINUTES):
     print(f"Total Eliminated before Time Loop: {len(all_pairs) - len(filtered_pairs)}")
     print("---------------------------------\n")
 
-    # 2. THE TIME LOOP & SPATIAL HASHING
+    # 2. THE TIME LOOP & SPATIAL HASHING (Multi-Processed)
     coarse_results = {}
+    time_steps = list(range(0, SCAN_MINUTES + 1, COARSE_STEP))
     
-    print(f"Initiating Spatial Hashing Loop for next {scan_minutes} minutes...")
+    print(f"Initiating Multi-Processing Spatial Hashing Loop for next {SCAN_MINUTES} minutes...")
     
-    for minute in range(0, scan_minutes + 1, COARSE_STEP):
-        future = now + timedelta(minutes=minute)
-        grid = {}
-        positions = {}
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # Submit all the time steps to the worker pool
+        futures = [
+            executor.submit(process_time_step, minute, now, active_satellites, valid_pair_ids) 
+            for minute in time_steps
+        ]
         
-        # Hash active satellites into the 3D grid
-        for norad_id, (obj, sat) in active_satellites.items():
-            pos = get_position(sat, future)
-            if pos:
-                positions[norad_id] = pos
-                cell = (int(pos[0] // CELL_SIZE), int(pos[1] // CELL_SIZE), int(pos[2] // CELL_SIZE))
-                if cell not in grid: grid[cell] = []
-                grid[cell].append(norad_id)
-        
-        # Check for collisions in same and adjacent cells
-        checked_this_step = set()
-        for (cx, cy, cz), sats_in_cell in grid.items():
+        # Aggregate the results as each time step finishes computing
+        for future in concurrent.futures.as_completed(futures):
+            step_results = future.result()
             
-            # Generate 27 grid checks (Center + 26 neighbors)
-            neighbors = [(cx+dx, cy+dy, cz+dz) for dx in [-1,0,1] for dy in [-1,0,1] for dz in [-1,0,1]]
-            
-            for neighbor in neighbors:
-                if neighbor in grid:
-                    for id_a in sats_in_cell:
-                        for id_b in grid[neighbor]:
-                            if id_a == id_b: continue
-                            
-                            pair_key = tuple(sorted([id_a, id_b]))
-                            if pair_key in checked_this_step: continue
-                            checked_this_step.add(pair_key)
-                            
-                            # Execute Math ONLY if they passed geometry filters and share a cell
-                            if pair_key in valid_pair_ids:
-                                dist = calculate_distance(positions[id_a], positions[id_b])
-                                if dist <= SCREENING_THRESHOLD:
-                                    if pair_key not in coarse_results or dist < coarse_results[pair_key]["distance"]:
-                                        coarse_results[pair_key] = {
-                                            "sat_a": active_satellites[id_a],
-                                            "sat_b": active_satellites[id_b],
-                                            "time": future,
-                                            "distance": dist
-                                        }
+            for pair_key, data in step_results.items():
+                if pair_key not in coarse_results or data["distance"] < coarse_results[pair_key]["distance"]:
+                    coarse_results[pair_key] = data
 
     # 3. THE FINE SEARCH
     conjunctions = []
@@ -277,8 +300,9 @@ def find_conjunctions(object_limit=OBJECT_LIMIT, scan_minutes=SCAN_MINUTES):
 if __name__ == "__main__":
     results = find_conjunctions()
     
-    print("\nCONJUNCTIONS FOUND")
-    print("-------------------")
-    for event in results["conjunctions"]:
-        print(event)
-    print(f"\nTotal potential conjunctions: {len(results['conjunctions'])}")
+    if results:
+        print("\nCONJUNCTIONS FOUND")
+        print("-------------------")
+        for event in results["conjunctions"]:
+            print(event)
+        print(f"\nTotal potential conjunctions: {len(results['conjunctions'])}")
