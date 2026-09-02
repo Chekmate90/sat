@@ -41,6 +41,11 @@ Then open the dashboard at [http://127.0.0.1:8000/dashboard](http://127.0.0.1:80
 
 Press **Refresh Analysis** to download current CelesTrak data and run the conjunction analysis. The analysis may take a short while because the application compares many object pairs.
 
+The analysis engine precomputes each satellite's screening data, uses NumPy and
+SGP4's vectorized propagation routines, and distributes independent fine-search
+work across a bounded pool of worker threads. A second refresh request receives
+an HTTP `409` response while an analysis is already running.
+
 ## API endpoints
 
 - `GET /` — API health message
@@ -54,5 +59,5 @@ Interactive API documentation is available at [http://127.0.0.1:8000/docs](http:
 ## Notes
 
 - Analysis results are cached in memory and are cleared when the server restarts.
-- The current configuration analyzes up to 120 recently added objects over a 60-minute window.
+- The dashboard can analyze up to 500 recently added objects over a 24-hour window.
 - CelesTrak availability is required when starting a new analysis.
