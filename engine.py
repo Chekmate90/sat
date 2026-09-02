@@ -1,4 +1,3 @@
-import json
 import math
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -330,13 +329,7 @@ def find_conjunctions(object_limit=OBJECT_LIMIT, scan_minutes=SCAN_MINUTES):
         objects = response.json()[:object_limit]
     except requests.RequestException as e:
         print("CelesTrak request failed:", e)
-        print("Loading sample data...")
-        try:
-            with open("sample_data_feb142026.json", "r") as f:
-                objects = json.load(f)[:object_limit]
-        except Exception as e2:
-             print("Failed to load sample data:", e2)
-             return None
+        return None
         
     satellites = [(obj, create_satellite(obj)) for obj in objects]
     now = datetime.now(timezone.utc)
