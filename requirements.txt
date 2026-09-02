@@ -1,5 +1,5 @@
 fastapi==0.141.1
+numpy>=2.0
 requests==2.34.2
 sgp4==2.27
 uvicorn==0.52.4
-
