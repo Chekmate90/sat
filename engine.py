@@ -21,9 +21,9 @@ SCREENING_THRESHOLD = 120 # km distance to flag as a conjunction
 
 # Multi-Tiered Filter Thresholds
 RADIAL_BUFFER_KM = 20
-MOID_THRESHOLD_KM = 150 
+MOID_THRESHOLD_KM = 120 
 EARTH_RADIUS_KM = 6371.0
-CELL_SIZE = 150 # Spatial hashing 3D grid size (km)
+CELL_SIZE = 120 # Spatial hashing 3D grid size (km)
 
 ORBIT_DURATION_MINUTES = 90
 ORBIT_SAMPLE_MINUTES = 5
